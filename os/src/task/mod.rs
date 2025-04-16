@@ -14,7 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM,MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use lazy_static::*;
@@ -54,6 +54,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            syscall_times: [0;MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -135,6 +136,19 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    //increase_syscall_times()函数参考了 @香草美人 的知乎专栏https://www.zhihu.com/column/c_1738250998752292864
+    fn increase_syscall_times(&self, syscall_id: usize) {
+        let mut inner: core::cell::RefMut<'_, TaskManagerInner> = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        inner.tasks[current_task].syscall_times[syscall_id] += 1;
+    }
+    //新增
+    fn get_single_syscall_time(&self, syscall_id: usize) -> u32 {
+    let inner = self.inner.exclusive_access();
+    inner.tasks[inner.current_task].syscall_times[syscall_id]
+}
+    
 }
 
 /// Run the first task in task list.
@@ -169,3 +183,17 @@ pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
 }
+
+//新增
+
+pub fn increase_syscall_times(syscall_id: usize) {
+    TASK_MANAGER.increase_syscall_times(syscall_id);
+}
+
+pub fn get_single_syscall_time(syscall_id: usize) -> isize {
+    if syscall_id >= MAX_SYSCALL_NUM {
+        return -1; // EINVAL
+    }
+    TASK_MANAGER.get_single_syscall_time(syscall_id) as isize
+}
+
