@@ -153,6 +153,16 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+    fn increase_syscall_times(&self, syscall_id: usize) {
+        let mut inner: core::cell::RefMut<'_, TaskManagerInner> = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        inner.tasks[current_task].syscall_times[syscall_id] += 1;
+    }
+    //新增
+    fn get_single_syscall_time(&self, syscall_id: usize) -> u32 {
+    let inner = self.inner.exclusive_access();
+    inner.tasks[inner.current_task].syscall_times[syscall_id]
+    }
 }
 
 /// Run the first task in task list.
