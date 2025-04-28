@@ -14,6 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_app_data, get_num_app};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
@@ -46,6 +47,7 @@ struct TaskManagerInner {
     tasks: Vec<TaskControlBlock>,
     /// id of current `Running` task
     current_task: usize,
+    
 }
 
 lazy_static! {
@@ -153,15 +155,21 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
-    fn increase_syscall_times(&self, syscall_id: usize) {
+    
+    fn increase_sys_call_times(&self, syscall_id: usize) {
         let mut inner: core::cell::RefMut<'_, TaskManagerInner> = self.inner.exclusive_access();
         let current_task = inner.current_task;
-        inner.tasks[current_task].syscall_times[syscall_id] += 1;
+        inner.tasks[current_task].sys_call_times[syscall_id] += 1;
     }
     //新增
-    fn get_single_syscall_time(&self, syscall_id: usize) -> u32 {
+    fn get_single_sys_call_time(&self, syscall_id: usize) -> u32 {
     let inner = self.inner.exclusive_access();
-    inner.tasks[inner.current_task].syscall_times[syscall_id]
+    inner.tasks[inner.current_task].sys_call_times[syscall_id]
+    }
+
+    fn get_sys_call_times(&self) -> [u32;MAX_SYSCALL_NUM] {
+        let inner = self.inner.exclusive_access();
+        inner.tasks[inner.current_task].sys_call_times.clone()
     }
 }
 
@@ -211,4 +219,20 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 /// Change the current 'Running' task's program break
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
+}
+
+// 新增
+pub fn increase_sys_call_times(syscall_id:usize){
+    TASK_MANAGER.increase_sys_call_times(syscall_id);
+}
+
+pub fn get_single_sys_call_time(syscall_id:usize) -> isize{
+    if syscall_id >= MAX_SYSCALL_NUM {
+        return -1; //EINVAL
+    }
+    TASK_MANAGER.get_single_sys_call_time(syscall_id) as isize
+}
+
+pub fn get_sys_call_times() -> [u32;MAX_SYSCALL_NUM] {
+    TASK_MANAGER.get_sys_call_times()
 }
