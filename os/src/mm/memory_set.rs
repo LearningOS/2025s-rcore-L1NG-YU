@@ -45,6 +45,7 @@ impl MemorySet {
         Self {
             page_table: PageTable::new(),
             areas: Vec::new(),
+            
         }
     }
     /// Get the page table token
@@ -260,6 +261,34 @@ impl MemorySet {
             true
         } else {
             false
+        }
+    }
+
+    ///mmap
+     pub fn mmap_area(&mut self,start_va: VirtAddr,end_va: VirtAddr,perm:MapPermission)-> Result<(),()>{
+        for area in &self.areas {
+            if ! (end_va <= area.vpn_range.get_start().into() || start_va >= area.vpn_range.get_end().into()) {
+                return Err(());
+            }
+        }
+        let new_area = MapArea::new(start_va, end_va, MapType::Framed, perm);
+        self.push(new_area, None);
+        Ok(())
+
+     }
+
+
+    ///munmap
+    pub fn munmap_area (&mut self,start_va: VirtAddr,end_va: VirtAddr)->Result<(),()> {
+        let pos = self.areas.iter().position(|area| {
+            area.vpn_range.get_start() == start_va.floor() && area.vpn_range.get_end() == end_va.ceil()
+        });
+        if let Some(pos) = pos {
+            let mut area = self.areas.remove(pos);
+            area.unmap(&mut self.page_table);
+            Ok(())
+        } else {
+            Err(())
         }
     }
 }

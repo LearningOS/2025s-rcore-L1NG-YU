@@ -16,10 +16,12 @@ mod task;
 
 use crate::config::MAX_SYSCALL_NUM;
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::*;
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
 use lazy_static::*;
+//use riscv::addr::VirtAddr;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
@@ -171,6 +173,21 @@ impl TaskManager {
         let inner = self.inner.exclusive_access();
         inner.tasks[inner.current_task].sys_call_times.clone()
     }
+
+    pub fn mmap(&self,start_va:VirtAddr,end_va:VirtAddr,perm:MapPermission)->Result<(),()>{
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        let memory_set = &mut inner.tasks[cur].memory_set;
+        memory_set.mmap_area(start_va, end_va, perm)
+    
+    }
+
+    pub fn munmap(&self,start_va:VirtAddr,end_va:VirtAddr)->Result<(),()>{
+        let mut inner = self.inner.exclusive_access();
+        let cur = inner.current_task;
+        let memory_set = &mut inner.tasks[cur].memory_set;
+        memory_set.munmap_area(start_va, end_va)
+    }
 }
 
 /// Run the first task in task list.
@@ -222,7 +239,7 @@ pub fn change_program_brk(size: i32) -> Option<usize> {
 }
 
 // 新增
-pub fn increase_sys_call_times(syscall_id:usize){
+pub fn increase_sys_call_times(syscall_id:usize) {
     TASK_MANAGER.increase_sys_call_times(syscall_id);
 }
 
@@ -236,3 +253,17 @@ pub fn get_single_sys_call_time(syscall_id:usize) -> isize{
 pub fn get_sys_call_times() -> [u32;MAX_SYSCALL_NUM] {
     TASK_MANAGER.get_sys_call_times()
 }
+
+
+
+//
+
+pub fn mmap(start_va:VirtAddr,end_va:VirtAddr,perm:MapPermission)->Result<(),()>{
+    TASK_MANAGER.mmap(start_va,end_va,perm)
+} 
+
+pub fn munmap(start_va:VirtAddr,end_va:VirtAddr)->Result<(),()>{
+    TASK_MANAGER.munmap(start_va,end_va)
+}
+
+
